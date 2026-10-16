@@ -1,0 +1,65 @@
+name: 📊 交易员看板 - 每日更新
+
+on:
+  # 定时触发（UTC时间）
+  schedule:
+    - cron: "30 0 * * *"   # 北京时间 08:30
+    - cron: "0 12 * * *"   # 北京时间 20:00
+
+  # 允许手动触发（方便测试）
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  update-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. 检出代码
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 2. 设置 Python
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # 3. 安装依赖
+      - name: 📦 Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      # 4. 运行数据更新脚本
+      - name: 🚀 Run update script
+        run: |
+          python main.py
+
+      # 5. 提交历史数据更新（保留到 main 分支）
+      - name: 💾 Commit history data
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "📈 update: $(date +'%Y-%m-%d %H:%M') 行情数据"
+          file_pattern: "data/history.csv"
+          branch: main
+
+      # 6. 部署到 GitHub Pages
+      - name: 🌐 Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        if: github.ref == 'refs/heads/main'
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./reports
+          publish_branch: gh-pages
+          force_orphan: false
+          keep_files: true
